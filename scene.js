@@ -9,22 +9,12 @@ var Screen = {
 var Scene = {
     Fons: [1, 0, 0],
     Shapes: [
-        //techo
+        //suelo
         {
             id		: "pla_gris",
             tipus	: "pla",
             normal	: vec3.fromValues(0, 2, 0),
             point   : vec3.fromValues( 0, -0.1, 0),
-			material : { ...Obsidian },
-			specular : false,
-			specularCoeff : null
-        },
-        //suelo
-		{
-            id		: "pla_verd2",
-            tipus	: "pla",
-            normal	: vec3.fromValues(0, 0, 0),
-            point   : vec3.fromValues(0, 100, 0),
 			material : { ...Obsidian },
 			specular : false,
 			specularCoeff : null
