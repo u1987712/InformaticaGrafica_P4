@@ -128,76 +128,6 @@ void main() {
     fragmentColor = vec4(finalColor, 1.0);
 }
 </script>
-
-<!-- Toon shader que no funciona
-<script id="toonVertexShader" type="x-shader/x-vertex">#version 300 es
-  uniform mat4 projectionMatrix, modelViewMatrix;
-  uniform mat3 normalMatrix;
-  in vec3 VertexPosition;
-  in vec3 VertexNormal;
-  out vec3 N, ec;
-  
-  void main() {
-      N = normalize(normalMatrix * VertexNormal);
-      vec4 ecPosition = modelViewMatrix * vec4(VertexPosition, 1.0);
-      ec = vec3(ecPosition);
-      gl_Position = projectionMatrix * ecPosition;
-  }
-  </script>
-  
-  <script id="toonFragmentShader" type="x-shader/x-fragment">#version 300 es
-  precision mediump float;
-  
-  struct LightData {
-      vec3 Position;
-      vec3 La;
-      vec3 Ld;
-      vec3 Ls;
-  };
-  uniform LightData Light[3];
-  
-  struct MaterialData {
-      vec3 Ka;
-      vec3 Kd;
-      vec3 Ks;
-      float alpha;
-  };
-  uniform MaterialData Material;
-  
-  in vec3 N, ec;
-  out vec4 fragmentColor;
-  
-  float cellShade(float intensity) {
-      if (intensity > 0.95) return 1.0;
-      else if (intensity > 0.5) return 0.7;
-      else if (intensity > 0.25) return 0.4;
-      else return 0.1;
-  }
-  
-  void main() {
-      vec3 n = normalize(N);
-      vec3 finalColor = vec3(0.0);
-      
-      for(int i = 0; i < 3; i++) {
-          vec3 L = normalize(Light[i].Position - ec);
-          float intensity = max(dot(n, L), 0.0);
-          float toonIntensity = cellShade(intensity);
-          
-          // Combinar el color del material con la intensidad toon
-          vec3 toonColor = Material.Kd * Light[i].Ld * toonIntensity;
-          finalColor += toonColor + (Material.Ka * Light[i].La);
-      }
-      
-      // Agregar borde
-      vec3 viewDir = normalize(-ec);
-      float edge = dot(viewDir, n);
-      if(edge < 0.2) {
-          finalColor = vec3(0.0);
-      }
-      
-      fragmentColor = vec4(finalColor, 1.0);
-  }
-  </script>-->
     
   </head>
   
@@ -219,8 +149,6 @@ void main() {
 
       <!-- Panel derecho para controles de iluminación -->    
       <div id="rightPanel">
-         <!-- Controles para alternar shaders -->
-        <h2>Toon Shader</h2><button id="shaderToggle">ON/OFF</button>
 
         <!-- Configuración de las luces -->
         <h2>Central light</h2>
