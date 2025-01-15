@@ -57,11 +57,9 @@
 		<!-- Panel izquierdo con descripción -->
 		<div id="leftPanel">
 			<h1 id="title">Ray Tracing</h1>
-			<p>Click on the canvas to see the scene and move the camera.</p>
+			<p>Click START to see the scene and move the camera.</p>
 			<p><strong>Movement controls:</strong></p>
 			<p>Use the <code>W</code>, <code>A</code>, <code>S</code> and <code>D</code> keys to move around the room.</p>
-		  	
-		<p style="text-indent:85px;">Camera Position: [3, 3.5, 5]</p>
 		</div>
 
 		<div id="rayTracing">
@@ -99,10 +97,12 @@
 				<input id="color2" type="color" name="2" oninput="changeColor(this)">
 			
 			</div>
+			
+			<input type="range" min="-2" max="-1" step="0.1" value="-1" oninput="aux(this)">
 		
 		</div>
 		
-		<input type="range" min="-2" max="-1" step="0.1" value="-1" oninput="aux(this)">
+		
 		
 		<script type="text/javascript" src="raytracingV2.js"></script>
 		

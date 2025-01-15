@@ -1,4 +1,3 @@
-
 // RAY TRACING - example //
 var resTot = [];
 
@@ -502,6 +501,8 @@ function calculateNewCentre () {
 	
 	Scene.Camera.centre = [Scene.Camera.position[0] + x, Scene.Camera.position[1] + y, Scene.Camera.position[2] + z];
 }
+
+
 
 //Function to initialize event handlers
 function initHandlers () {
