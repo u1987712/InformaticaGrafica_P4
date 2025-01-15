@@ -6,7 +6,7 @@
   
     <meta charset="utf-8">
     
-    <title> Práctica 3 </title>
+    <title> Práctica 4 </title>
     
     <style>
     body {
@@ -54,7 +54,6 @@
     </style>
 
 	<body>
-		<!-- Panel izquierdo con descripción -->
 		<div id="leftPanel">
 			<h1 id="title">Ray Tracing</h1>
 			<p>Click START to see the scene and move the camera.</p>
@@ -83,28 +82,18 @@
 			</div>
 			
 			<div id="materials">
-			<label for="materials">LIGHT 1:&ensp;</label>
-
-				<!-- <label for="color"><strong>&ensp;Ma</strong></label> -->
+			<label for="materials">Light 1:&ensp;</label>
 				<input id="color1" type="color" name="1" oninput="changeColor(this)">
 			
 			</div>
 		
 			<div id="materials">
-				<label for="materials">LIGHT 2:&ensp;</label>
-
-				<!-- <label for="color"><strong>&ensp;Ma</strong></label> -->
+				<label for="materials">Light 2:&ensp;</label>
 				<input id="color2" type="color" name="2" oninput="changeColor(this)">
 			
 			</div>
-			
-			<input type="range" min="-2" max="-1" step="0.1" value="-1" oninput="aux(this)">
 		
 		</div>
-		
-		
-		
-		<script type="text/javascript" src="raytracingV2.js"></script>
 		
 		<script src="gl-matrix/common.js"></script>
 		<script type="text/javascript" src="materiales.js"></script>

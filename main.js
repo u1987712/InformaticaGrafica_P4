@@ -1,10 +1,8 @@
-// RAY TRACING - example //
-var resTot = [];
 
-//Angles to calculate the position of centre
+//Angles per calcular la posició central
 var theta = Math.PI;
 var phi = -Math.PI/2.0;
-//Acumulative variables of previous angles
+//Variables dels angles anteriors
 var lastTheta = 0.0;
 var lastPhi = 0.0;
 
@@ -15,44 +13,38 @@ var isMouseDown = false;
 
 // Inicialitzem el RayTracing
 function inicialitzar(Scene) {
-
-	// Parametres de les llums
-	// Put it interactively
-	// Scene.Lights[0].position = [-1, 2, 4];
-	// Scene.Lights[0].color = [0.4, 0.4, 0.4];
-	// Scene.Lights[1].position = [1, 4, 4];
-	// Scene.Lights[1].color = [1, 0, 0];
-
 	Screen.canvas = document.getElementById("glcanvas");
 	if (Screen.canvas == null)	{
 		alert("Invalid element: " + id);
 		return;
 	}
+
+	//Obtenim el contexte del canvas
 	Screen.context = Screen.canvas.getContext("2d");
 	if(Screen.context == null){
 		alert("Could not get context");
 		return;
 	}
+	//Configuració del tamany i del buffer del canvas
 	Screen.width = Screen.canvas.width;
 	Screen.height = Screen.canvas.height;
 	Screen.buffer = Screen.context.createImageData(Screen.width,Screen.height);
 
-	// Calculem els eixos de la camera
+	// Calculem els eixos de la càmera
 	calcularEixos(Scene);
 
-	// Calculem els increments i P0 (GLOBALS)
+	// Calculem els increments en X i Y
 	incX = calcularIncrementX(Scene.Camera,Screen);
 	incY = calcularIncrementY(Scene.Camera,Screen);
 	P0 = calcularP0(incX,incY,Scene.Camera,Screen);
 	
-	// initHandlers();
 	
-	// Executem RayTracing
+	// Executem el RayTracing
 	rayTracing(Scene, Screen);
 	Screen.context.putImageData(Screen.buffer, 0, 0);
 };
 
-// Calcular increment de X
+// Calculem increment del eix X de la càmera
 function calcularIncrementX(Cam,Scr) {
 	var rati = (Scr.height/Scr.width);
 
@@ -67,7 +59,7 @@ function calcularIncrementX(Cam,Scr) {
 }
 
 
-// Calcular increment de Y
+// Calculem increment del eix Y de la càmera
 function calcularIncrementY(Cam,Scr) {
 	var rati = (Scr.height/Scr.width);
 
@@ -82,7 +74,7 @@ function calcularIncrementY(Cam,Scr) {
 }
 
 
-// Calcular P0
+// Calculem P0 - punt inicial del raig
 function calcularP0(incX,incY,Cam,Scr) {
 
 	var P = vec3.subtract(Cam.position,Cam.Z); // Calculem P (O - Z)
@@ -95,7 +87,7 @@ function calcularP0(incX,incY,Cam,Scr) {
 }
 
 
-// Calcular els eixos de la camera
+// Calculem els eixos de la càmera
 function calcularEixos(Scene) {
 	Scene.Camera.Z = vec3.normalize(vec3.subtract(Scene.Camera.position, Scene.Camera.centre)); // |O - C|
 	Scene.Camera.X = vec3.normalize(vec3.cross(Scene.Camera.up, Scene.Camera.Z)); // |up x Z|
@@ -112,18 +104,13 @@ function plot(x,y,color){
 	return index;
 }
 
-// Pintar cada pixel
-function rayTracing(Scene, Screen) {
-	// console.log(incX);
+// Pintem cada píxel
+function rayTracing(Scene, Screen) {;
 	for(var x = 0; x < Screen.width; x++){
 		for (y = 0; y < Screen.height; y++){
 			var rDirection = computeRay(incX,incY,P0,Scene.Camera,x,y);
-
 			var color = [0.3,0.4,1];
 			color = IntersectScene(Scene, rDirection, Scene.Camera.position, 0);
-			// TO BE IMPLEMENTED
-			// computeFirstHit(Scene, rDirection);
-			//var color = intersectarScene(Scene, Scene.Camera.position, rDirection);
 			plot(x,y,color);
 		}
 	}
@@ -141,6 +128,7 @@ var hitInfo = {
 	specularCoeff : null
 };
 
+//Calculem la intersecció del raig amb els objectes
 function IntersectScene(scene, ray, origin, depth){
 	var hit = computeFirstHit(scene, ray, origin);
 	if (hit){
@@ -159,6 +147,7 @@ function IntersectScene(scene, ray, origin, depth){
 	return [0.3, 0.4, 1.0];
 }
 
+//Càlcul de la llum
 function computeLight(scene, hit, ray, depth){
 	var matAmbient = vec3.fromValues(hit.material.mat_ambient[0], hit.material.mat_ambient[1], hit.material.mat_ambient[2]);
 	var ambientComponent = vec3.multiply(vec3.fromValues(1.0, 1.0, 1.0), matAmbient);
@@ -166,14 +155,10 @@ function computeLight(scene, hit, ray, depth){
 	var i = 0;
 	
 	for (var light of scene.Lights){
-		// if (i == 0){
-			// console.log("Hit: " + hit.surfaceId);
-		// }
 		var l = vec3.normalize(vec3.subtract(light.position, hit.point)); //Vector entre punt i llum
 		var n = vec3.normalize(hit.normal);
 		var partR = vec3.dot(n, l) * 2;
 		var r = vec3.add(vec3.multiply(l, vec3.fromValues(-1, -1, -1)), vec3.multiply(vec3.fromValues(partR, partR, partR), n));
-		// var r = computeReflectedVector(n, l);
 		
 		var matDiffuse = vec3.fromValues(hit.material.mat_diffuse[0], hit.material.mat_diffuse[1], hit.material.mat_diffuse[2]);
 		var matSpecular = vec3.fromValues(hit.material.mat_specular[0], hit.material.mat_specular[1], hit.material.mat_specular[2]);
@@ -188,10 +173,6 @@ function computeLight(scene, hit, ray, depth){
 		var newHitPoint = vec3.add(hit.point, vec3.multiply(vec3.fromValues(0.01, 0.01, 0.01), l));
 		var l2 = vec3.subtract(light.position, hit.point);
 		var hit2 = computeShadowing(scene, vec3.normalize(l2), newHitPoint, hit.surfaceId);
-		// if (i == 0){
-			// console.log("Hit2: " + hit2.surfaceId);
-			// i++;
-		// }
 		var vi = 1;
 		if (hit2){
 			if (hit2.t !== null && (hit2.t > 0 && hit2.t < vec3.length(l2))){
@@ -203,24 +184,18 @@ function computeLight(scene, hit, ray, depth){
 		var aux4 = vec3.multiply(vec3.add(diffuseComponent, specularComponent), aux3);
 		res = vec3.add(res, aux4);
 		
-		//Specular reflection
-		// if (hit.specular && depth < 2){
-			// var d1 = computeReflectionDirection(hit, ray);	//The new ray will be the vector d1 and origin hit.point
-			// var color = IntersectScene(scene, d1, depth + 1);
-			// res = vec3.add(res, vec3.multiply(vec3.fromValues(hit.specularCoeff, hit.specularCoeff, hit.specularCoeff), vec3.fromValues(color[0], color[1], color[2])));
-		// }
 	}
 	
 	return res;
 }
 
+//Càlcul de la direcció del reflexe del raig
 function computeReflectionDirection(hit, ray){
 	var n = vec3.normalize(hit.normal);
 
 	var term1 = vec3.multiply(vec3.fromValues(2, 2, 2), n);
 	var term2 = vec3.dot(ray, n);
 	var term3 = vec3.multiply(term1, vec3.fromValues(term2, term2, term2));
-	// console.log(term3);
 	return vec3.normalize(vec3.subtract(ray, term3));
 }
 
@@ -249,22 +224,18 @@ function computeShadowing(scene, ray, center, surfaceId){
 
 function computeFirstHit(scene, ray, centre){
 	var lowestT = null;
-	// var CamCentre = vec3.fromValues(Scene.Camera.position[0], Scene.Camera.position[1], Scene.Camera.position[2]);
 	for(var primitive of scene.Shapes){
 		
 		var hit = intersect(primitive, ray, centre);
-		// console.log(hit.surfaceId + " " + hit.t);
 		if (hit !== null && hit.t !== null){
 			if ((!lowestT || hit.t < lowestT.t))
 				lowestT = hit;
 		}
 	}
-	// console.log(lowestT);
 	return lowestT;
 }
 
 function intersect(primitive, ray, centre, shadowing = false){
-	// console.log(primitive.tipus);
 	switch (primitive.tipus){
 		case "esfera":
 			return QuadraticEquationSolver(primitive, centre, ray);
@@ -277,7 +248,6 @@ function intersect(primitive, ray, centre, shadowing = false){
 			break;
 		case "triangle":
 			var aux = TriangleIntersection(primitive, centre, ray);
-			// console.log(aux);
 			return aux;
 			break;
 	}
@@ -286,19 +256,14 @@ function intersect(primitive, ray, centre, shadowing = false){
 function QuadraticEquationSolver(sphere, CamCentre, v){
 	var a = vec3.dot(v, v);
 	
-	// console.log(sphere.centre, o);
 	var SphereCentre = vec3.fromValues(sphere.centre[0], sphere.centre[1], sphere.centre[2]);
-	// var CamCentre = vec3.fromValues(o[0], o[1], o[2]);
 	var diff = vec3.subtract(CamCentre, SphereCentre);
 	var mult = vec3.dot(v, diff);
 	var b = mult * 2;
-	// console.log(b);
 	
 	var diff1 = vec3.subtract(CamCentre, SphereCentre);
-	// var diff2 = vec3.subtract(SphereCentre, CamCentre);
 	var diffTot = vec3.dot(diff1, diff1);
 	var c = diffTot - Math.pow(sphere.radi, 2);
-	// console.log(c);
 	
 	var sqrtPart = Math.pow(b, 2) - (4 * a * c);
 	if (sqrtPart < 0)
@@ -315,7 +280,6 @@ function QuadraticEquationSolver(sphere, CamCentre, v){
 			t = t2;
 		else{
 			t = null;
-			// console.log(t1, t2);
 		}
 	}
 	
@@ -341,42 +305,12 @@ function QuadraticEquationSolver(sphere, CamCentre, v){
 
 function PlaneIntersection(primitive, centre, v, abs = true){
 	var h = { ...hitInfo };
-	
-	// var denom = vec3.dot(primitive.normal, vec3.normalize(v));
-	// if (Math.abs(denom) > 0.0001){
-		// var v1 = vec3.subtract(primitive.point, centre);
-		// var v2 = vec3.normalize(v1);
-		// var t = vec3.dot(v1, primitive.normal) / denom;
-		// var point = vec3.add(centre, vec3.multiply(vec3.fromValues(t, t, t), vec3.normalize(v)));
-		// console.log(t);
-		// if (t >= 0){
-			// h.t = t;
-			// h.normal = primitive.normal;
-			// h.point = point;
-			// h.surfaceId = primitive.id;
-			// h.material = primitive.material;
-			// h.specular = primitive.specular;
-			// h.specularCoeff = primitive.specularCoeff;
-			
-			// return h;
-		// }
-		// return null;
-	// }
-	// return null;
-		
 	var d = vec3.dot(primitive.normal, primitive.point) * -1;
 	var numerator = (-d) - (vec3.dot(primitive.normal, centre));
 	var denominator = vec3.dot(primitive.normal, vec3.normalize(v));
 	var t = numerator / denominator;
 	var point = vec3.add(centre, vec3.multiply(vec3.fromValues(t, t, t), vec3.normalize(v)));
-	// if (abs)
-		// h.t = Math.abs(t);
-	// else{
-		// if (t >= 0)
-			// h.t = t;
-		// else
-			// h.t = null;
-	// }
+	
 	if (t >= 0)
 		h.t = t;
 	else
@@ -400,7 +334,6 @@ function TriangleIntersection(primitive, centre, ray){
 	var u = vec3.subtract(primitive.b, primitive.a);
 	var v = vec3.subtract(primitive.c, primitive.a);
 	var normal = vec3.cross(u, v);
-	// var normal = vec3.cross(v, u);
 	
 	var normalRayDirection = vec3.dot(normal, ray);
 	if (Math.abs(normalRayDirection) < 0.0001)
@@ -441,45 +374,11 @@ function TriangleIntersection(primitive, centre, ray){
 	h.specularCoeff = primitive.specularCoeff;
 	
 	return h;
-	
-	// var i = vec3.subtract(point, primitive.a);
-	
-	// var firstNumS = vec3.dot(u, v) * vec3.dot(i, v);
-	// var secondNumS = vec3.dot(v, v) * vec3.dot(i, u);
-	// var numeratorS = firstNumS - secondNumS;
-	
-	// var firstDenomS = vec3.dot(u, v) * vec3.dot(u, v);
-	// var secondDenomS = vec3.dot(u, u) + vec3.dot(v, v);
-	// var denominatorS = firstDenomS - secondDenomS;
-	
-	// var s = numeratorS / denominatorS;
-	
-	// var firstNumT = vec3.dot(u, v) * vec3.dot(i, u);
-	// var secondNumT = vec3.dot(u, u) * vec3.dot(i, v);
-	// var numeratorT = firstNumT - secondNumT;
-	
-	// var tt = numeratorT / denominatorS;
-	// console.log(s+tt);
-	// if (s+tt >= 0 && s+tt <= 1){
-		// h.t = Math.abs(t);
-		// h.normal = normal;
-		// h.point = point;
-		// h.surfaceId = primitive.id;
-		// h.type = primitive.tipus;
-		// h.material = primitive.material;
-		// h.specular = primitive.specular;
-		// h.specularCoeff = primitive.specularCoeff;
-		
-		// return h;
-	// }
-	// else
-		// return null;
 }
 
-// Computar el raig
+// Computem el raig
 function computeRay(incX,incY,P0,Cam,x,y){
-	// console.log(Cam.position);
-	// Calculem la direccio per a cada pixel
+	// Calculem la direcció per a cada píxel
 	var aux = vec3.scale(incX,x); // Increment de X * x
 	var aux2 = vec3.scale(incY,y); // Increment de Y * y
 	var aux3 = vec3.add(P0,aux); // P0 + Increment de X * x
@@ -490,7 +389,7 @@ function computeRay(incX,incY,P0,Cam,x,y){
 	return rayNorm;
 }
 
-//Function to calculate the new centre
+//Calculem el nou centre
 function calculateNewCentre () {
 	var centre = vec3.fromValues(Scene.Camera.centre[0], Scene.Camera.centre[1], Scene.Camera.centre[2]);
 	var position = Scene.Camera.position;
@@ -504,7 +403,7 @@ function calculateNewCentre () {
 
 
 
-//Function to initialize event handlers
+//Inicialitzem els handlers
 function initHandlers () {
 	var canvas = document.getElementById("glcanvas");
 	
@@ -515,14 +414,12 @@ function initHandlers () {
 			Scene.Camera.position[2] -= 0.25;
 			Scene.Camera.centre[2] -= 0.25;
 			update = true;
-			// console.log(Scene.Camera.position);
 		}
 		//S
 		else if (event.keyCode === 83){
 			Scene.Camera.position[2] += 0.25;
 			Scene.Camera.centre[2] += 0.25;
 			update = true;
-			// console.log(Scene.Camera.position);
 		}
 		//A
 		else if (event.keyCode === 65){
@@ -538,7 +435,6 @@ function initHandlers () {
 		}
 		
 		event.preventDefault();
-		// rayTracing(Scene, Screen);
 		if (update)
 			inicialitzar(Scene);
 	}, false);
@@ -570,7 +466,6 @@ function initHandlers () {
 		lastPhi = event.clientY;
 		lastTheta = event.clientX;
 		
-		//We set the range of both angles to [0rad...2PIrad]
 		if (theta < 0)
 			theta += Math.PI * 2;
 		if (phi < 0)
@@ -582,9 +477,9 @@ function initHandlers () {
 	}, false);
 }
 
-//Function to create a POI
+//Per crear nous POI
 function savePOI () {
-	//We set the structure to store info about POI
+	//Estructura per guardar un POI
 	var newPOI = {
 		"eye" : vec3.fromValues(Scene.Camera.position[0], Scene.Camera.position[1], Scene.Camera.position[2]),
 		"centre" : vec3.fromValues(Scene.Camera.centre[0], Scene.Camera.centre[1], Scene.Camera.centre[2]),
@@ -593,23 +488,22 @@ function savePOI () {
 		"lastPhi" : lastPhi,
 		"lastTheta" : lastTheta
 	};
-	//Push back the new POI
+	//Push back el nou POI
 	poiArray.push(newPOI);
 	
-	//We set the name and value of option for select tag in HTML
+	//Nou tag per el nou POI
 	var optionText = 'POI ' + poiArray.length.toString();
 	var newOption = new Option(optionText, (poiArray.length - 1).toString());
 	
-	//Add option to HTML
+	//Tag afegit com a nova opció en el HTML
 	select.add(newOption, undefined);
 }
 
-//Function to drive the camera to any POI selected in select tag
+//De la càmera al POI
 function goToPOI () {
-	// We get the POI
 	var poi = poiArray[parseInt(select.value)];
 	
-	// We reset all variables
+	// Resetegem les variables
 	Scene.Camera.position = poi.eye;
 	Scene.Camera.centre = poi.centre;
 	phi = poi.phi;
@@ -617,7 +511,7 @@ function goToPOI () {
 	lastPhi = poi.lastPhi;
 	lastTheta = poi.lastTheta;
 	
-	// Draw again
+	// Dibuixem un altre cop
 	inicialitzar(Scene);
 }
 
@@ -630,7 +524,7 @@ function changeColor(input){
 		Scene.Lights[1].color = fromHexToRGB(input.value);
 }
 
-//Function to turn HEX value to RGB
+//Per transformar un valor HEX a RGB
 function fromHexToRGB (value) {
 	var myColor = value.substr(1);
 	  
@@ -646,10 +540,6 @@ function fromHexToRGB (value) {
 }
 
 function aux(slider){
-	// console.log(slider.value);
-	Scene.Shapes[6].a[2] = slider.value;
-	// Scene.Shapes[6].b[2] = slider.value;
-	// Scene.Shapes[6].c[2] = slider.value;
-	
+	Scene.Shapes[6].a[2] = slider.value;	
 	inicialitzar(Scene);
 }
