@@ -1,144 +1,162 @@
-  function drawScene() {
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // se inicializan los buffers de color y de profundidad
-    setShaderProjectionMatrix(getProjectionMatrix());// se obtiene la matriz de transformacion de la proyeccion y se envia al shader
+var Screen = {
+    width 	: 0,
+    height 	: 0,
+    canvas 	: null,
+    context : null,
+    buffer 	: null,
+};
 
-    drawRoom();
-    drawCube();
-    drawSuzzane();  
-    drawLights();
-  }
+var Scene = {
+    Fons: [1, 0, 0],
+    Shapes: [
+        {
+            id		: "pla_gris",
+            tipus	: "pla",
+            normal	: vec3.fromValues(0, 1, 0),
+            point   : vec3.fromValues( 0, -0.1, 0),
+			material : { ...Silver },
+			specular : false,
+			specularCoeff : null
+        },
+        /*{
+            id		: "pla_vermell",
+            tipus	: "pla",
+            normal	: vec3.fromValues(0, 0, 1),
+            point   : vec3.fromValues(0, 0, -100),
+			material : { ...Ruby },
+			specular : false,
+			specularCoeff : null
+        },*/
+		/*{
+            id		: "pla_groc",
+            tipus	: "pla",
+            normal	: vec3.fromValues(0, 0, -1),
+            point   : vec3.fromValues(0, 0, 100),
+			material : { ...Gold },
+			specular : false,
+			specularCoeff : null
+        },*/
+		/*{
+            id		: "pla_lila",
+            tipus	: "pla",
+            normal	: vec3.fromValues(1, 0, 0),
+            point   : vec3.fromValues(-100, 0, 0),
+			material : { ...Tin },
+			specular : false,
+			specularCoeff : null
+        },*/
+		/*{
+            id		: "pla_verd",
+            tipus	: "pla",
+            normal	: vec3.fromValues(-1, 0, 0),
+            point   : vec3.fromValues(100, 0, 0),
+			material : { ...Jade },
+			specular : false,
+			specularCoeff : null
+        },*/
+		{
+            id		: "pla_verd2",
+            tipus	: "pla",
+            normal	: vec3.fromValues(0, -1, 0),
+            point   : vec3.fromValues(0, 100, 0),
+			material : { ...Obsidian },
+			specular : false,
+			specularCoeff : null
+        },
+        {
+            id		: "esfera_blava",
+            tipus	: "esfera",
+            radi	: 1.5,
+            centre	: [-1.5,1.5,1],
+			material : { ...Jade },
+			specular : true,
+			specularCoeff : 1.0
 
-  function drawRoom(){
-    // Dibujar el plano (suelo)
-    var modelMatrixPlane = mat4.create();
-    var modelViewMatrixPlane = mat4.create();
-    mat4.fromTranslation(modelMatrixPlane, [0.0, 0.0, 0.0]); // Mover el plano debajo del cubo
-    mat4.fromScaling(modelMatrixPlane, [20.0, 1.0, 20.0]); // Escalar el plano
-    mat4.multiply(modelViewMatrixPlane, getCameraMatrix(), modelMatrixPlane);
-    setShaderModelViewMatrix(modelViewMatrixPlane);
-    setShaderNormalMatrix(getNormalMatrix(modelViewMatrixPlane));
-    setShaderMaterial(Perl);
-    drawSolid(examplePlane); // Dibujar el plano
-  
-    // Ajustes para las paredes
-    var wallThickness = 0.5; // Grosor de las paredes
-    var wallHeight = 5.0;    // Altura de las paredes
-    var planeLength = 20.0;  // Dimensiones del plano (escala aplicada)
-    setShaderMaterial(Perl);
-  
-    // Pared Frontal
-    var modelMatrixWallFront = mat4.create();
-    var modelViewMatrixWallFront = mat4.create();
-    mat4.translate(modelMatrixWallFront, modelMatrixWallFront, [0.0, wallHeight / 2.0, planeLength/2]);
-    mat4.scale(modelMatrixWallFront, modelMatrixWallFront, [planeLength, wallHeight, wallThickness]);
-    mat4.multiply(modelViewMatrixWallFront, getCameraMatrix(), modelMatrixWallFront);
-    setShaderModelViewMatrix(modelViewMatrixWallFront);
-    setShaderNormalMatrix(getNormalMatrix(modelViewMatrixWallFront));
-    drawSolid(exampleCube);
-  
-    // Pared Trasera
-    var modelMatrixWallBack = mat4.create();
-    var modelViewMatrixWallBack = mat4.create();
-    mat4.translate(modelMatrixWallBack, modelMatrixWallBack, [0.0, wallHeight / 2.0, -planeLength/2]);
-    mat4.scale(modelMatrixWallBack, modelMatrixWallBack, [planeLength, wallHeight, wallThickness]);
-    mat4.multiply(modelViewMatrixWallBack, getCameraMatrix(), modelMatrixWallBack);
-    setShaderModelViewMatrix(modelViewMatrixWallBack);
-    setShaderNormalMatrix(getNormalMatrix(modelViewMatrixWallBack));
-    drawSolid(exampleCube);
-  
-    // Pared Izquierda
-    var modelMatrixWallLeft = mat4.create();
-    var modelViewMatrixWallLeft = mat4.create();
-    mat4.translate(modelMatrixWallLeft, modelMatrixWallLeft, [-planeLength/2, wallHeight / 2.0, 0.0]);
-    mat4.scale(modelMatrixWallLeft, modelMatrixWallLeft, [wallThickness, wallHeight, planeLength]);
-    mat4.multiply(modelViewMatrixWallLeft, getCameraMatrix(), modelMatrixWallLeft);
-    setShaderModelViewMatrix(modelViewMatrixWallLeft);
-    setShaderNormalMatrix(getNormalMatrix(modelViewMatrixWallLeft));
-    drawSolid(exampleCube);
-  
-    // Pared Derecha
-    var modelMatrixWallRight = mat4.create();
-    var modelViewMatrixWallRight = mat4.create();
-    mat4.translate(modelMatrixWallRight, modelMatrixWallRight, [planeLength/2, wallHeight / 2.0, 0.0]);
-    mat4.scale(modelMatrixWallRight, modelMatrixWallRight, [wallThickness, wallHeight, planeLength]);
-    mat4.multiply(modelViewMatrixWallRight, getCameraMatrix(), modelMatrixWallRight);
-    setShaderModelViewMatrix(modelViewMatrixWallRight);
-    setShaderNormalMatrix(getNormalMatrix(modelViewMatrixWallRight));
-    drawSolid(exampleCube);
-  
-    // Dibujar el plano (techo)
-    var modelMatrixCeiling = mat4.create();
-    var modelViewMatrixCeiling = mat4.create();
-    mat4.translate(modelMatrixCeiling, modelMatrixCeiling, [0.0, wallHeight, 0.0]);
-    mat4.scale(modelMatrixCeiling, modelMatrixCeiling, [20.0, 1.0, 20.0]);
-    mat4.multiply(modelViewMatrixCeiling, getCameraMatrix(), modelMatrixCeiling);
-    setShaderModelViewMatrix(modelViewMatrixCeiling);
-    setShaderNormalMatrix(getNormalMatrix(modelViewMatrixCeiling));
-    setShaderMaterial(White_rubber);
-    drawSolid(examplePlane);
-  }
-
-  function drawCube(){
-    // Dibujar el cubo
-    var modelMatrixCube = mat4.create();
-    var modelViewMatrixCube = mat4.create();
-    mat4.translate(modelMatrixCube, modelMatrixCube, [0.0, 0.5, 0.0]);
-    mat4.scale(modelMatrixCube, modelMatrixCube, [3, 1, 3]);
-    mat4.multiply(modelViewMatrixCube, getCameraMatrix(), modelMatrixCube);
-    setShaderModelViewMatrix(modelViewMatrixCube);
-    setShaderNormalMatrix(getNormalMatrix(modelViewMatrixCube));
-    setShaderMaterial(Chrome);
-    drawSolid(exampleCube);
-  }
-
-  function drawSuzzane(){
-    
-    // Dibujar el objeto 
-    var modelMatrix = mat4.create();
-    var modelViewMatrix = mat4.create();
-    mat4.fromTranslation(modelMatrix, [0.0, 2, 0.0]);
-    mat4.multiply(modelViewMatrix, getCameraMatrix(), modelMatrix);
-    setShaderModelViewMatrix(modelViewMatrix);
-  
-    setShaderNormalMatrix(getNormalMatrix(modelViewMatrix));
-    setShaderMaterial(Polished_gold);
-    drawSolidOBJ(suzzane);
-  }
-
-  function drawLights(){
-    //Frontal
-    var modelMatrix = mat4.create();
-    var modelViewMatrix = mat4.create()
-    mat4.translate(modelMatrix, modelMatrix, [0.0, 4.75, 9.75]);
-    mat4.scale(modelMatrix, modelMatrix, [0.25, 0.25, 0.25]);
-    mat4.multiply(modelViewMatrix, getCameraMatrix(), modelMatrix);
-    setShaderModelViewMatrix(modelViewMatrix);
-    
-    setShaderNormalMatrix(getNormalMatrix(modelViewMatrix) );
-    setShaderMaterial(White_plastic);
-    drawSolid(exampleSphere);
-
-    //Izquierda
-    var modelMatrix = mat4.create();
-    var modelViewMatrix = mat4.create()
-    mat4.translate(modelMatrix, modelMatrix, [-9.75, 4.75, 0.0]);
-    mat4.scale(modelMatrix, modelMatrix, [0.25, 0.25, 0.25]);
-    mat4.multiply(modelViewMatrix, getCameraMatrix(), modelMatrix);
-    setShaderModelViewMatrix(modelViewMatrix);
-    
-    setShaderNormalMatrix(getNormalMatrix(modelViewMatrix) );
-    setShaderMaterial(White_plastic);
-    drawSolid(exampleSphere);
-
-    //Derecha
-    var modelMatrix = mat4.create();
-    var modelViewMatrix = mat4.create()
-    mat4.translate(modelMatrix, modelMatrix, [9.75, 4.75, 0.0]);
-    mat4.scale(modelMatrix, modelMatrix, [0.25, 0.25, 0.25]);
-    mat4.multiply(modelViewMatrix, getCameraMatrix(), modelMatrix);
-    setShaderModelViewMatrix(modelViewMatrix);
-    
-    setShaderNormalMatrix(getNormalMatrix(modelViewMatrix) );
-    setShaderMaterial(White_plastic);
-    drawSolid(exampleSphere);
-  }
+        },
+		{
+			id : "triangle1",
+			tipus : "triangle",
+			a : vec3.fromValues(-4.5, 3.2, -1),
+			b : vec3.fromValues(-1.5, 3.2, -1),
+			c : vec3.fromValues(-4, 4.0, -1),
+			material : { ...Obsidian },
+			specular : false,
+			specularCoeff : null
+		},
+		{
+			id : "triangle2",
+			tipus : "triangle",
+			a : vec3.fromValues(0.0, 3.2, -1),
+			b : vec3.fromValues(1.0, 3.2, -1),
+			c : vec3.fromValues(0.5, 4.0, -1),
+			material : { ...Esmerald },
+			specular : false,
+			specularCoeff : null
+		},
+		{
+            id		: "esfera_verda",
+            tipus	: "esfera",
+            radi	: 0.4,
+            centre	: [-2.5,0.4,4],
+			material : { ...Jade },
+			specular : false,
+			specularCoeff : null
+        },
+		// {
+            // id		: "esfera_blava",
+            // tipus	: "esfera",
+            // radi	: 0.4,
+            // centre	: [-1.7,0.4,4],
+			// material : { ...White_rubber },
+			// specular : true,
+			// specularCoeff : 0.8
+        // },
+		// {
+            // id		: "esfera_vermella",
+            // tipus	: "esfera",
+            // radi	: 0.4,
+            // centre	: [-0.9,0.4,4],
+			// material : { ...Red_plastic },
+			// specular : false,
+			// specularCoeff : null
+        // },
+		// {
+            // id		: "esfera_groga",
+            // tipus	: "esfera",
+            // radi	: 0.4,
+            // centre	: [-0.1,0.4,4],
+			// material : { ...White_rubber },
+			// specular : true,
+			// specularCoeff : 0.8
+        // },
+		// {
+            // id		: "esfera_bronze",
+            // tipus	: "esfera",
+            // radi	: 0.4,
+            // centre	: [0.7,0.4,4],
+			// material : { ...Bronze },
+			// specular : false,
+			// specularCoeff : null
+        // }
+    ],
+    Camera: {
+        position: vec3.fromValues(0.0, 2.0, 5.0),
+        up: [0.0, 1.0, 0.0],
+        centre: vec3.fromValues(0.0, 2.0, 4.0),
+        fov: 60,
+        X: vec3.create(),
+        Y: vec3.create(),
+        Z: vec3.create()
+    },
+    Lights: [
+        {
+            position: /*vec3.fromValues(-1.0, 4.0, 2.0),*/vec3.fromValues(-1.0, 5.0, 2.0),
+            // color   : vec3.fromValues(0.7, 0.7, 0.7)
+            color   : vec3.fromValues(0.8, 0.8, 0.8)
+        },
+		{
+            position: /*vec3.fromValues(-1.0, 4.0, 2.0),*/vec3.fromValues(-4.0, 6.0, 2.0),
+            color   : vec3.fromValues(0.2, 0.2, 0.2)
+        }
+    ]
+};

@@ -1,389 +1,654 @@
-//Gemma Reina Lara - u1987712
-var gl, program;
-var myZeta = 0.0, myPhi = Math.PI/2.0, radius = 4, fovy = 1.4;
-var lightStates = [true, true, true]; // Estado de las luces (encendido/apagado)
-var lightIntensities = [0.5, 0.5, 0.5]; // Intensidades de las luces
 
-function getWebGLContext() {
-  var canvas = document.getElementById("myCanvas");
-  try {
-    return canvas.getContext("webgl2");
-  } catch (e) {}
-  return null;
+// RAY TRACING - example //
+var resTot = [];
+
+//Angles to calculate the position of centre
+var theta = Math.PI;
+var phi = -Math.PI/2.0;
+//Acumulative variables of previous angles
+var lastTheta = 0.0;
+var lastPhi = 0.0;
+
+var poiArray = [];
+var select = document.getElementById('choosePOI');
+
+var isMouseDown = false;
+
+// Inicialitzem el RayTracing
+function inicialitzar(Scene) {
+
+	// Parametres de les llums
+	// Put it interactively
+	// Scene.Lights[0].position = [-1, 2, 4];
+	// Scene.Lights[0].color = [0.4, 0.4, 0.4];
+	// Scene.Lights[1].position = [1, 4, 4];
+	// Scene.Lights[1].color = [1, 0, 0];
+
+	Screen.canvas = document.getElementById("glcanvas");
+	if (Screen.canvas == null)	{
+		alert("Invalid element: " + id);
+		return;
+	}
+	Screen.context = Screen.canvas.getContext("2d");
+	if(Screen.context == null){
+		alert("Could not get context");
+		return;
+	}
+	Screen.width = Screen.canvas.width;
+	Screen.height = Screen.canvas.height;
+	Screen.buffer = Screen.context.createImageData(Screen.width,Screen.height);
+
+	// Calculem els eixos de la camera
+	calcularEixos(Scene);
+
+	// Calculem els increments i P0 (GLOBALS)
+	incX = calcularIncrementX(Scene.Camera,Screen);
+	incY = calcularIncrementY(Scene.Camera,Screen);
+	P0 = calcularP0(incX,incY,Scene.Camera,Screen);
+	
+	// initHandlers();
+	
+	// Executem RayTracing
+	rayTracing(Scene, Screen);
+	Screen.context.putImageData(Screen.buffer, 0, 0);
+};
+
+// Calcular increment de X
+function calcularIncrementX(Cam,Scr) {
+	var rati = (Scr.height/Scr.width);
+
+	var theta = (Cam.fov * Math.PI / 180);
+	var w = 2*Math.tan(theta/2); // Calculem w' = 2*tg(theta/2)
+	var h = w*rati; // Calculem h' = w'*rati
+
+	var aux = w/Scr.width; // w'/W
+	var incX = vec3.scale(Cam.X,aux); // Calculem increment de X (X * 2*tg(theta/2)/W)
+
+	return incX;
 }
 
-//Inicialización shaders
-function initShaders() {
-  var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-  gl.shaderSource(vertexShader, document.getElementById("myVertexShader").text);
-  gl.compileShader(vertexShader);
-  if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-    alert(gl.getShaderInfoLog(vertexShader));
-    return null;
-  }
 
-  var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-  gl.shaderSource(fragmentShader, document.getElementById("myFragmentShader").text);
-  gl.compileShader(fragmentShader);
-  if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-    alert(gl.getShaderInfoLog(fragmentShader));
-    return null;
-  }
-  
-  //Creación y vinculación programa de shaders
-  program = gl.createProgram();
-  gl.attachShader(program, vertexShader);
-  gl.attachShader(program, fragmentShader);
-  gl.linkProgram(program);
-  gl.useProgram(program);
-  
-  //Uniformes
-  program.vertexPositionAttribute = gl.getAttribLocation( program, "VertexPosition");
-  gl.enableVertexAttribArray(program.vertexPositionAttribute);
-  program.modelViewMatrixIndex  = gl.getUniformLocation( program, "modelViewMatrix");
-  program.projectionMatrixIndex = gl.getUniformLocation( program, "projectionMatrix");
-  
-  //Normales
-  program.vertexNormalAttribute = gl.getAttribLocation ( program, "VertexNormal");
-  program.normalMatrixIndex     = gl.getUniformLocation( program, "normalMatrix");
-  gl.enableVertexAttribArray(program.vertexNormalAttribute);
+// Calcular increment de Y
+function calcularIncrementY(Cam,Scr) {
+	var rati = (Scr.height/Scr.width);
 
-  //Material
-  program.KaIndex               = gl.getUniformLocation( program, "Material.Ka");
-  program.KdIndex               = gl.getUniformLocation( program, "Material.Kd");
-  program.KsIndex               = gl.getUniformLocation( program, "Material.Ks");
-  program.alphaIndex            = gl.getUniformLocation( program, "Material.alpha");
+	var theta = (Cam.fov * Math.PI / 180);
+	var w = 2*Math.tan(theta/2); // Calculem w' = 2*tg(theta/2)
+	var h = w*rati; // Calculem h' = w'*rati
 
-  //Fuentes de luz
-  program.lightUniforms = [];
-    for(let i = 0; i < 3; i++) {
-        program.lightUniforms[i] = {
-            LaIndex: gl.getUniformLocation(program, `Light[${i}].La`),
-            LdIndex: gl.getUniformLocation(program, `Light[${i}].Ld`),
-            LsIndex: gl.getUniformLocation(program, `Light[${i}].Ls`),
-            PositionIndex: gl.getUniformLocation(program, `Light[${i}].Position`)
-        };
-    }  
+	var aux = rati*w/Scr.height; // rati*w'/H
+	var incY = vec3.scale(Cam.Y,aux); // Calculem increment de Y (Y * 2*tg(theta/2)/W)
+
+	return incY;
 }
 
-//Inicialización render
-function initRendering() { 
-  gl.clearColor(0.95,0.95,0.95,1.0);
-  gl.enable(gl.DEPTH_TEST);
-  setShaderLight();
+
+// Calcular P0
+function calcularP0(incX,incY,Cam,Scr) {
+
+	var P = vec3.subtract(Cam.position,Cam.Z); // Calculem P (O - Z)
+	var aux = vec3.scale(incX,((Scr.width-1)/2)); // Increment de X * (W-1)/2
+	var aux2 = vec3.scale(incY,((Scr.height-1)/2)); // Increment de Y * (H-1)/2
+	var aux3 = vec3.subtract(P,aux); // P - Increment de X * (W-1)/2
+	var P0 = vec3.add(aux3,aux2); // Calculem P0 (P - Increment de X * (W-1)/2 + Increment de Y * (H-1)/2)
+
+	return P0;
 }
 
-//Inicialización buffers
-function initBuffers(model) {
-  model.idBufferVertices = gl.createBuffer ();
-  gl.bindBuffer (gl.ARRAY_BUFFER, model.idBufferVertices);
-  gl.bufferData (gl.ARRAY_BUFFER, new Float32Array(model.vertices), gl.STATIC_DRAW);
-    
-  model.idBufferNormals = gl.createBuffer ();
-  gl.bindBuffer (gl.ARRAY_BUFFER, model.idBufferNormals);
-  gl.bufferData (gl.ARRAY_BUFFER, new Float32Array(model.vertexNormals), gl.STATIC_DRAW);
-  
-  model.idBufferIndices = gl.createBuffer ();
-  gl.bindBuffer (gl.ELEMENT_ARRAY_BUFFER, model.idBufferIndices);
-  gl.bufferData (gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(model.indices), gl.STATIC_DRAW);
 
+// Calcular els eixos de la camera
+function calcularEixos(Scene) {
+	Scene.Camera.Z = vec3.normalize(vec3.subtract(Scene.Camera.position, Scene.Camera.centre)); // |O - C|
+	Scene.Camera.X = vec3.normalize(vec3.cross(Scene.Camera.up, Scene.Camera.Z)); // |up x Z|
+	Scene.Camera.Y = vec3.cross(Scene.Camera.Z, Scene.Camera.X); // Z x X
 }
 
-//Inicialización objetos de la escena
-function initPrimitives() {
-  initBuffers(examplePlane); //Planos
-  initBuffers(exampleCube); //Cubo
-  initBuffers(exampleSphere); //Esfera
-  initBuffers(suzzane); //Suzzane
+
+function plot(x,y,color){
+	var index = (x+y*Screen.buffer.width)*4;
+	Screen.buffer.data[index+0] = color[0] * 255;
+	Screen.buffer.data[index+1] = color[1] * 255;
+	Screen.buffer.data[index+2] = color[2] * 255;
+	Screen.buffer.data[index+3] = 255;
+	return index;
 }
 
-//Matriz de proyección en el shader
-function setShaderProjectionMatrix(projectionMatrix) {
-  gl.uniformMatrix4fv(program.projectionMatrixIndex, false, projectionMatrix);
+// Pintar cada pixel
+function rayTracing(Scene, Screen) {
+	// console.log(incX);
+	for(var x = 0; x < Screen.width; x++){
+		for (y = 0; y < Screen.height; y++){
+			var rDirection = computeRay(incX,incY,P0,Scene.Camera,x,y);
+
+			var color = [0.3,0.4,1];
+			color = IntersectScene(Scene, rDirection, Scene.Camera.position, 0);
+			// TO BE IMPLEMENTED
+			// computeFirstHit(Scene, rDirection);
+			//var color = intersectarScene(Scene, Scene.Camera.position, rDirection);
+			plot(x,y,color);
+		}
+	}
+	console.log("Done");
 }
 
-//Matriz de modelo-vista en el shader
-function setShaderModelViewMatrix(modelViewMatrix) {
-  
-  gl.uniformMatrix4fv(program.modelViewMatrixIndex, false, modelViewMatrix);
-  
+var hitInfo = {
+	t: 0,
+	normal: 0,
+	point: 0,
+	surfaceId: "",
+	type : "",
+	material : 0,
+	specular : false,
+	specularCoeff : null
+};
+
+function IntersectScene(scene, ray, origin, depth){
+	var hit = computeFirstHit(scene, ray, origin);
+	if (hit){
+		if (hit.t !== null){
+			var light = computeLight(scene, hit, ray, depth);
+			if (hit.specular && depth < 4){
+				var d1 = computeReflectionDirection(hit, ray);	//The new ray will be the vector d1 and origin hit.point
+				var newHitPoint = vec3.add(hit.point, vec3.multiply(vec3.fromValues(0.01, 0.01, 0.01), d1));
+				var color = IntersectScene(scene, d1, newHitPoint, depth + 1);
+				var colorVec3 = vec3.fromValues(color[0], color[1], color[2]);
+				light = vec3.add(light, vec3.multiply(vec3.fromValues(hit.specularCoeff, hit.specularCoeff, hit.specularCoeff), colorVec3));
+			}
+			return [light[0], light[1], light[2]];
+		}
+	}
+	return [0.3, 0.4, 1.0];
 }
 
-//Matriz de normales en el shader
-function setShaderNormalMatrix(normalMatrix) {
-  
-  gl.uniformMatrix3fv(program.normalMatrixIndex, false, normalMatrix);
-  
+function computeLight(scene, hit, ray, depth){
+	var matAmbient = vec3.fromValues(hit.material.mat_ambient[0], hit.material.mat_ambient[1], hit.material.mat_ambient[2]);
+	var ambientComponent = vec3.multiply(vec3.fromValues(1.0, 1.0, 1.0), matAmbient);
+	var res = ambientComponent;
+	var i = 0;
+	
+	for (var light of scene.Lights){
+		// if (i == 0){
+			// console.log("Hit: " + hit.surfaceId);
+		// }
+		var l = vec3.normalize(vec3.subtract(light.position, hit.point)); //Vector entre punt i llum
+		var n = vec3.normalize(hit.normal);
+		var partR = vec3.dot(n, l) * 2;
+		var r = vec3.add(vec3.multiply(l, vec3.fromValues(-1, -1, -1)), vec3.multiply(vec3.fromValues(partR, partR, partR), n));
+		// var r = computeReflectedVector(n, l);
+		
+		var matDiffuse = vec3.fromValues(hit.material.mat_diffuse[0], hit.material.mat_diffuse[1], hit.material.mat_diffuse[2]);
+		var matSpecular = vec3.fromValues(hit.material.mat_specular[0], hit.material.mat_specular[1], hit.material.mat_specular[2]);
+		
+		var aux1 = Math.max(0, vec3.dot(n, l));
+		var diffuseComponent = vec3.multiply(matDiffuse, vec3.fromValues(aux1, aux1, aux1));
+		
+		var ray2 = vec3.normalize(vec3.multiply(vec3.fromValues(-1, -1, -1), ray));
+		var aux2 = Math.pow(Math.max(0, vec3.dot(ray2, vec3.normalize(r))), 1.5);
+		var specularComponent = vec3.multiply(matSpecular, vec3.fromValues(aux2, aux2, aux2));
+		
+		var newHitPoint = vec3.add(hit.point, vec3.multiply(vec3.fromValues(0.01, 0.01, 0.01), l));
+		var l2 = vec3.subtract(light.position, hit.point);
+		var hit2 = computeShadowing(scene, vec3.normalize(l2), newHitPoint, hit.surfaceId);
+		// if (i == 0){
+			// console.log("Hit2: " + hit2.surfaceId);
+			// i++;
+		// }
+		var vi = 1;
+		if (hit2){
+			if (hit2.t !== null && (hit2.t > 0 && hit2.t < vec3.length(l2))){
+				vi = 0.5;
+			}
+		}
+
+		var aux3 = vec3.multiply(light.color, vec3.fromValues(vi, vi, vi));
+		var aux4 = vec3.multiply(vec3.add(diffuseComponent, specularComponent), aux3);
+		res = vec3.add(res, aux4);
+		
+		//Specular reflection
+		// if (hit.specular && depth < 2){
+			// var d1 = computeReflectionDirection(hit, ray);	//The new ray will be the vector d1 and origin hit.point
+			// var color = IntersectScene(scene, d1, depth + 1);
+			// res = vec3.add(res, vec3.multiply(vec3.fromValues(hit.specularCoeff, hit.specularCoeff, hit.specularCoeff), vec3.fromValues(color[0], color[1], color[2])));
+		// }
+	}
+	
+	return res;
 }
 
-//Matriz de normales de una matriz de modelo-vista
-function getNormalMatrix(modelViewMatrix) {
-  
-  return mat3.normalFromMat4(mat3.create(), modelViewMatrix);
-  
+function computeReflectionDirection(hit, ray){
+	var n = vec3.normalize(hit.normal);
+
+	var term1 = vec3.multiply(vec3.fromValues(2, 2, 2), n);
+	var term2 = vec3.dot(ray, n);
+	var term3 = vec3.multiply(term1, vec3.fromValues(term2, term2, term2));
+	// console.log(term3);
+	return vec3.normalize(vec3.subtract(ray, term3));
 }
 
-//Matriz de proyección basada en los parámetros actuales
-function getProjectionMatrix() {
-  
-  return mat4.perspective(mat4.create(), fovy, 1.0, 0.1, 100.0);
-  
+function computeReflectedVector(n, l){
+	var aux1 = vec3.dot(n, l) * 2;
+	var aux2 = vec3.multiply(vec3.fromValues(aux1, aux1, aux1), n);
+	var aux3 = vec3.subtract(aux2, l);
+	return aux3;
 }
 
-//Parámetros materiales en el shader
-function setShaderMaterial(material) {
-  gl.uniform3fv(program.KaIndex,    material.mat_ambient); //ambiental
-  gl.uniform3fv(program.KdIndex,    material.mat_diffuse); //difuso
-  gl.uniform3fv(program.KsIndex,    material.mat_specular); //especular
-  gl.uniform1f (program.alphaIndex, material.alpha); //transparencia  
+function computeShadowing(scene, ray, center, surfaceId){
+	var hit = null;
+	for (var primitive of scene.Shapes){
+		hit = intersect(primitive, ray, center, true);
+		if (hit && hit.t !== null)
+			break;
+		if (primitive.id !== surfaceId || primitive.tipus === "esfera" || primitive.tipus === "triangle"){
+			hit = intersect(primitive, ray, center, true);
+			if (hit && hit.t !== null){
+				break;
+			}
+		}
+	}
+	return hit;
 }
 
-//Configuración las luces iniciales
-function setShaderLight() {
-    //Luz 1 (Frontal)
-    gl.uniform3f(program.lightUniforms[0].LaIndex, 0.2, 0.2, 0.2);  // Ambiente suave
-    gl.uniform3f(program.lightUniforms[0].LdIndex, 1.0, 1.0, 1.0);  // Difusa blanca
-    gl.uniform3f(program.lightUniforms[0].LsIndex, 1.0, 1.0, 1.0);  // Especular blanca
-    gl.uniform3f(program.lightUniforms[0].PositionIndex, 0.0, 4.75, 9.75,);  // Posición arriba
-
-    // Luz 2 (lateral izquierda)
-    gl.uniform3f(program.lightUniforms[1].LaIndex, 0.1, 0.1, 0.1);
-    gl.uniform3f(program.lightUniforms[1].LdIndex, 0.8, 0.0, 0.0);  // Luz roja
-    gl.uniform3f(program.lightUniforms[1].LsIndex, 0.8, 0.0, 0.0);
-    gl.uniform3f(program.lightUniforms[1].PositionIndex, -9.75, 4.75, 0.0);
-
-    // Luz 3 (lateral derecha)
-    gl.uniform3f(program.lightUniforms[2].LaIndex, 0.1, 0.1, 0.1);
-    gl.uniform3f(program.lightUniforms[2].LdIndex, 0.0, 0.0, 0.8);  // Luz azul
-    gl.uniform3f(program.lightUniforms[2].LsIndex, 1.0, 1.0, 1.0);
-    gl.uniform3f(program.lightUniforms[2].PositionIndex, 9.75, 4.75, 0.0);
+function computeFirstHit(scene, ray, centre){
+	var lowestT = null;
+	// var CamCentre = vec3.fromValues(Scene.Camera.position[0], Scene.Camera.position[1], Scene.Camera.position[2]);
+	for(var primitive of scene.Shapes){
+		
+		var hit = intersect(primitive, ray, centre);
+		// console.log(hit.surfaceId + " " + hit.t);
+		if (hit !== null && hit.t !== null){
+			if ((!lowestT || hit.t < lowestT.t))
+				lowestT = hit;
+		}
+	}
+	// console.log(lowestT);
+	return lowestT;
 }
 
-//Modelo 3D sólido
-function drawSolidOBJ(model) { 
-  gl.bindBuffer (gl.ARRAY_BUFFER, model.idBufferVertices);
-  gl.vertexAttribPointer (program.vertexPositionAttribute, 3, gl.FLOAT, false, 0,   0);
-  
-  gl.bindBuffer (gl.ARRAY_BUFFER, model.idBufferNormals);
-  gl.vertexAttribPointer (program.vertexNormalAttribute,   3, gl.FLOAT, false, 0, 0);
-    
-  gl.bindBuffer   (gl.ELEMENT_ARRAY_BUFFER, model.idBufferIndices);
-  gl.drawElements (gl.TRIANGLES, model.indices.length, gl.UNSIGNED_SHORT, 0);
+function intersect(primitive, ray, centre, shadowing = false){
+	// console.log(primitive.tipus);
+	switch (primitive.tipus){
+		case "esfera":
+			return QuadraticEquationSolver(primitive, centre, ray);
+			break;
+		case "pla":
+			if (shadowing)
+				return PlaneIntersection(primitive, centre, ray, false);
+			else
+				return PlaneIntersection(primitive, centre, ray);
+			break;
+		case "triangle":
+			var aux = TriangleIntersection(primitive, centre, ray);
+			// console.log(aux);
+			return aux;
+			break;
+	}
 }
 
-//Primitivas sólidas
-function drawSolid(model) {    
-  gl.bindBuffer (gl.ARRAY_BUFFER, model.idBufferVertices);
-  gl.vertexAttribPointer (program.vertexPositionAttribute, 3, gl.FLOAT, false, 2*3*4,   0);
-  gl.vertexAttribPointer (program.vertexNormalAttribute,   3, gl.FLOAT, false, 2*3*4, 3*4);
-    
-  gl.bindBuffer   (gl.ELEMENT_ARRAY_BUFFER, model.idBufferIndices);
-  gl.drawElements (gl.TRIANGLES, model.indices.length, gl.UNSIGNED_SHORT, 0);
+function QuadraticEquationSolver(sphere, CamCentre, v){
+	var a = vec3.dot(v, v);
+	
+	// console.log(sphere.centre, o);
+	var SphereCentre = vec3.fromValues(sphere.centre[0], sphere.centre[1], sphere.centre[2]);
+	// var CamCentre = vec3.fromValues(o[0], o[1], o[2]);
+	var diff = vec3.subtract(CamCentre, SphereCentre);
+	var mult = vec3.dot(v, diff);
+	var b = mult * 2;
+	// console.log(b);
+	
+	var diff1 = vec3.subtract(CamCentre, SphereCentre);
+	// var diff2 = vec3.subtract(SphereCentre, CamCentre);
+	var diffTot = vec3.dot(diff1, diff1);
+	var c = diffTot - Math.pow(sphere.radi, 2);
+	// console.log(c);
+	
+	var sqrtPart = Math.pow(b, 2) - (4 * a * c);
+	if (sqrtPart < 0)
+		return null;
+	
+	var t1 = (-b + Math.sqrt(sqrtPart)) / (2 * a);
+	var t2 = (-b - Math.sqrt(sqrtPart)) / (2 * a);
+	var t;
+	
+	if (t1 > 0 || t2 > 0){
+		if ((t1 < t2 && t1 > 0))
+			t = t1;
+		else if (t2 > 0)
+			t = t2;
+		else{
+			t = null;
+			// console.log(t1, t2);
+		}
+	}
+	
+	var point = null;
+	var normal = null;
+	if (t !== null){
+		point = vec3.add(CamCentre, vec3.multiply(vec3.fromValues(t, t, t), v));
+		normal = vec3.divide(vec3.subtract(point, SphereCentre), vec3.fromValues(sphere.radi, sphere.radi, sphere.radi));
+	}
+
+	var h = { ...hitInfo };
+	h.t = t;
+	h.normal = normal;
+	h.point = point;
+	h.surfaceId = sphere.id;
+	h.type = sphere.tipus;
+	h.material = sphere.material;
+	h.specular = sphere.specular;
+	h.specularCoeff = sphere.specularCoeff;
+
+	return h;
 }
 
-//Interacciones
-function initHandlers() {
-    const canvas = document.getElementById("myCanvas");
-    const keys = {};
-    let isMouseLocked = false;
-
-    //Manejo de teclado
-    document.addEventListener("keydown", (event) => {
-        keys[event.key.toLowerCase()] = true;
-    });
-
-    document.addEventListener("keyup", (event) => {
-        keys[event.key.toLowerCase()] = false;
-    });
-
-    //Control de ratón
-    canvas.addEventListener("click", () => {
-        if (!isMouseLocked) {
-            canvas.requestPointerLock();
-        }
-    });
-
-    document.addEventListener("pointerlockchange", () => {
-        isMouseLocked = document.pointerLockElement === canvas;
-    });
-
-    document.addEventListener("mousemove", (event) => {
-        if (!isMouseLocked) return;
-
-        const deltaX = event.movementX * sensitivity;
-        const deltaY = event.movementY * sensitivity;
-
-        yaw += deltaX;
-        pitch = Math.max(-89.0, Math.min(89.0, pitch - deltaY));
-
-        updateCameraVectors();
-        requestAnimationFrame(drawScene);
-    });
-
-    function updateMovement() {
-      if (Object.values(keys).some(key => key)) {
-          const rightVector = vec3.create();
-          vec3.cross(rightVector, cameraFront, cameraUp);
-          vec3.normalize(rightVector, rightVector);
-  
-          const frontVector = vec3.fromValues(cameraFront[0], 0, cameraFront[2]);
-          vec3.normalize(frontVector, frontVector);
-  
-          const moveVector = vec3.create();
-          const newPosition = vec3.create();
-          vec3.copy(newPosition, cameraPosition);
-  
-          // Calcular y verificar el movimiento por separado para cada dirección
-          if (keys["w"] || keys["s"]) {
-              const tempPos = vec3.create();
-              vec3.copy(tempPos, newPosition);
-              vec3.scaleAndAdd(tempPos, tempPos, frontVector, 
-                             keys["w"] ? moveSpeed : -moveSpeed);
-              const checkedPos = checkCollision(tempPos);
-              vec3.copy(newPosition, checkedPos);
-          }
-  
-          if (keys["a"] || keys["d"]) {
-              const tempPos = vec3.create();
-              vec3.copy(tempPos, newPosition);
-              vec3.scaleAndAdd(tempPos, tempPos, rightVector, 
-                             keys["d"] ? moveSpeed : -moveSpeed);
-              const checkedPos = checkCollision(tempPos);
-              vec3.copy(newPosition, checkedPos);
-          }
-  
-          // Actualizar la posición de la cámara
-          vec3.copy(cameraPosition, newPosition);
-          
-          requestAnimationFrame(drawScene);
-      }
-  
-      requestAnimationFrame(updateMovement);
-    }
-
-    //Control de luces
-    var colors = document.getElementsByTagName("input");
-
-    for (var i = 0; i < colors.length; i++) {
-      colors[i].addEventListener("change", function() {
-          // Cambiar la luz correspondiente según el nombre del input
-          switch (this.getAttribute("name")) {
-              case "La1": 
-                  setColor(program.lightUniforms[0].LaIndex, this.value, 0); break;
-              case "Ld1": 
-                  setColor(program.lightUniforms[0].LdIndex, this.value, 0); break;
-              case "Ls1": 
-                  setColor(program.lightUniforms[0].LsIndex, this.value, 0); break;
-  
-              case "La2": 
-                  setColor(program.lightUniforms[1].LaIndex, this.value, 1); break;
-              case "Ld2": 
-                  setColor(program.lightUniforms[1].LdIndex, this.value, 1); break;
-              case "Ls2": 
-                  setColor(program.lightUniforms[1].LsIndex, this.value, 1); break;
-  
-              case "La3": 
-                  setColor(program.lightUniforms[2].LaIndex, this.value, 2); break;
-              case "Ld3": 
-                  setColor(program.lightUniforms[2].LdIndex, this.value, 2); break;
-              case "Ls3": 
-                  setColor(program.lightUniforms[2].LsIndex, this.value, 2); break;
-          }
-          requestAnimationFrame(drawScene);
-      }, false);
-    }
-
-    //Elementos de control
-    var lightToggle1 = document.getElementById("light1-toggle");
-    var lightToggle2 = document.getElementById("light2-toggle");
-    var lightToggle3 = document.getElementById("light3-toggle");
-
-    var intensitySlider1 = document.getElementById("light1-intensity");
-    var intensitySlider2 = document.getElementById("light2-intensity");
-    var intensitySlider3 = document.getElementById("light3-intensity");
-
-    //Eventos para encender/apagar las luces
-    lightToggle1.addEventListener("change", function() {
-    lightStates[0] = this.checked;
-    updateLight(0); // Actualizar la luz 1
-    });
-
-    lightToggle2.addEventListener("change", function() {
-    lightStates[1] = this.checked;
-    updateLight(1); // Actualizar la luz 2
-    });
-
-    lightToggle3.addEventListener("change", function() {
-    lightStates[2] = this.checked;
-    updateLight(2); // Actualizar la luz 3
-    });
-
-    //Eventos para cambiar la intensidad
-    intensitySlider1.addEventListener("input", function() {
-    lightIntensities[0] = parseFloat(this.value);
-    updateLight(0); // Actualizar la luz 1
-    });
-
-    intensitySlider2.addEventListener("input", function() {
-    lightIntensities[1] = parseFloat(this.value);
-    updateLight(1); // Actualizar la luz 2
-    });
-
-    intensitySlider3.addEventListener("input", function() {
-    lightIntensities[2] = parseFloat(this.value);
-    updateLight(2); // Actualizar la luz 3
-    });
-
-    requestAnimationFrame(updateMovement);
+function PlaneIntersection(primitive, centre, v, abs = true){
+	var h = { ...hitInfo };
+	
+	// var denom = vec3.dot(primitive.normal, vec3.normalize(v));
+	// if (Math.abs(denom) > 0.0001){
+		// var v1 = vec3.subtract(primitive.point, centre);
+		// var v2 = vec3.normalize(v1);
+		// var t = vec3.dot(v1, primitive.normal) / denom;
+		// var point = vec3.add(centre, vec3.multiply(vec3.fromValues(t, t, t), vec3.normalize(v)));
+		// console.log(t);
+		// if (t >= 0){
+			// h.t = t;
+			// h.normal = primitive.normal;
+			// h.point = point;
+			// h.surfaceId = primitive.id;
+			// h.material = primitive.material;
+			// h.specular = primitive.specular;
+			// h.specularCoeff = primitive.specularCoeff;
+			
+			// return h;
+		// }
+		// return null;
+	// }
+	// return null;
+		
+	var d = vec3.dot(primitive.normal, primitive.point) * -1;
+	var numerator = (-d) - (vec3.dot(primitive.normal, centre));
+	var denominator = vec3.dot(primitive.normal, vec3.normalize(v));
+	var t = numerator / denominator;
+	var point = vec3.add(centre, vec3.multiply(vec3.fromValues(t, t, t), vec3.normalize(v)));
+	// if (abs)
+		// h.t = Math.abs(t);
+	// else{
+		// if (t >= 0)
+			// h.t = t;
+		// else
+			// h.t = null;
+	// }
+	if (t >= 0)
+		h.t = t;
+	else
+		h.t = null;
+	
+	h.normal = primitive.normal;
+	h.point = point;
+	h.surfaceId = primitive.id;
+	h.type = primitive.tipus;
+	h.material = primitive.material;
+	h.specular = primitive.specular;
+	h.specularCoeff = primitive.specularCoeff;
+	
+	return h;
 }
 
-//Cambiar color de la luz
-function setColor(index, value, lightIndex) {
-  var myColor = value.substr(1); // Para eliminar el # del #FCA34D
+function TriangleIntersection(primitive, centre, ray){
 
-  var r = parseInt(myColor.charAt(0) + myColor.charAt(1), 16) / 255.0;
-  var g = parseInt(myColor.charAt(2) + myColor.charAt(3), 16) / 255.0;
-  var b = parseInt(myColor.charAt(4) + myColor.charAt(5), 16) / 255.0;
-
-  gl.uniform3f(index, r, g, b); // Para la fuente de luz correspondiente
+	var h = { ...hitInfo };
+	
+	var u = vec3.subtract(primitive.b, primitive.a);
+	var v = vec3.subtract(primitive.c, primitive.a);
+	var normal = vec3.cross(u, v);
+	// var normal = vec3.cross(v, u);
+	
+	var normalRayDirection = vec3.dot(normal, ray);
+	if (Math.abs(normalRayDirection) < 0.0001)
+		return null;
+	
+	var d = vec3.dot(normal, primitive.a);
+	var t = -(vec3.dot(normal, centre) + d) / normalRayDirection;
+	if (t < 0)
+		return null;
+	
+	var point = vec3.add(centre, vec3.multiply(vec3.fromValues(t, t, t), ray));
+	
+	var edge0 = vec3.subtract(primitive.b, primitive.a);
+	var vp0 = vec3.subtract(point, primitive.a);
+	var C = vec3.cross(edge0, vp0);
+	if (vec3.dot(normal, C) < 0)
+		return null;
+	
+	var edge1 = vec3.subtract(primitive.c, primitive.b);
+	var vp1 = vec3.subtract(point, primitive.b);
+	C = vec3.cross(edge1, vp1);
+	if (vec3.dot(normal, C) < 0)
+		return null;
+	
+	var edge2 = vec3.subtract(primitive.a, primitive.c);
+	var vp2 = vec3.subtract(point, primitive.c);
+	C = vec3.cross(edge2, vp2);
+	if (vec3.dot(normal, C) < 0)
+		return null;
+	
+	h.t = Math.abs(t);
+	h.normal = normal;
+	h.point = point;
+	h.surfaceId = primitive.id;
+	h.type = primitive.tipus;
+	h.material = primitive.material;
+	h.specular = primitive.specular;
+	h.specularCoeff = primitive.specularCoeff;
+	
+	return h;
+	
+	// var i = vec3.subtract(point, primitive.a);
+	
+	// var firstNumS = vec3.dot(u, v) * vec3.dot(i, v);
+	// var secondNumS = vec3.dot(v, v) * vec3.dot(i, u);
+	// var numeratorS = firstNumS - secondNumS;
+	
+	// var firstDenomS = vec3.dot(u, v) * vec3.dot(u, v);
+	// var secondDenomS = vec3.dot(u, u) + vec3.dot(v, v);
+	// var denominatorS = firstDenomS - secondDenomS;
+	
+	// var s = numeratorS / denominatorS;
+	
+	// var firstNumT = vec3.dot(u, v) * vec3.dot(i, u);
+	// var secondNumT = vec3.dot(u, u) * vec3.dot(i, v);
+	// var numeratorT = firstNumT - secondNumT;
+	
+	// var tt = numeratorT / denominatorS;
+	// console.log(s+tt);
+	// if (s+tt >= 0 && s+tt <= 1){
+		// h.t = Math.abs(t);
+		// h.normal = normal;
+		// h.point = point;
+		// h.surfaceId = primitive.id;
+		// h.type = primitive.tipus;
+		// h.material = primitive.material;
+		// h.specular = primitive.specular;
+		// h.specularCoeff = primitive.specularCoeff;
+		
+		// return h;
+	// }
+	// else
+		// return null;
 }
 
-//Actualizar la luz (color, encendido/apagado, intensidad)
-function updateLight(lightIndex) {
-  var lightUniform = program.lightUniforms[lightIndex];
-  var lightState = lightStates[lightIndex];
-  var intensity = lightIntensities[lightIndex];
+// Computar el raig
+function computeRay(incX,incY,P0,Cam,x,y){
+	// console.log(Cam.position);
+	// Calculem la direccio per a cada pixel
+	var aux = vec3.scale(incX,x); // Increment de X * x
+	var aux2 = vec3.scale(incY,y); // Increment de Y * y
+	var aux3 = vec3.add(P0,aux); // P0 + Increment de X * x
+	var aux4 = vec3.subtract(aux3,aux2); // P0 + Increment de X * x - Increment de Y * y
+	var ray = vec3.subtract(aux4,Cam.position); // Obtenim raig (P0 + Increment de X * x - Increment de Y * y - O)
+	var rayNorm = vec3.normalize(ray); // Normalitzem el raig
 
-  if (!lightState) {
-      // Apagar la luz
-      gl.uniform3f(lightUniform.LaIndex, 0, 0, 0);
-      gl.uniform3f(lightUniform.LdIndex, 0, 0, 0);
-      gl.uniform3f(lightUniform.LsIndex, 0, 0, 0);
-  } else {
-      // Encender con intensidad
-      gl.uniform3f(lightUniform.LaIndex, intensity, intensity, intensity);
-      gl.uniform3f(lightUniform.LdIndex, intensity, intensity, intensity);
-      gl.uniform3f(lightUniform.LsIndex, intensity, intensity, intensity);
-  }
+	return rayNorm;
 }
 
-//Inicialización del programa
-function initWebGL() {
-  gl = getWebGLContext();
-  if (!gl) {
-    alert("WebGL 2.0 no está disponible");
-    return;
-  }
-
-  initShaders();
-  initPrimitives();
-  initRendering();
-  initHandlers();
-  requestAnimationFrame(drawScene);
-  // Llamada inicial para configurar las luces al inicio
-  updateLight(0);
-  updateLight(1);
-  updateLight(2);
+//Function to calculate the new centre
+function calculateNewCentre () {
+	var centre = vec3.fromValues(Scene.Camera.centre[0], Scene.Camera.centre[1], Scene.Camera.centre[2]);
+	var position = Scene.Camera.position;
+	var radius = vec3.length(vec3.subtract(centre, position));
+	var x = radius * Math.sin(phi) * Math.sin(theta);
+	var y = radius * Math.cos(phi);
+	var z = radius * Math.sin(phi) * Math.cos(theta);
+	
+	Scene.Camera.centre = [Scene.Camera.position[0] + x, Scene.Camera.position[1] + y, Scene.Camera.position[2] + z];
 }
 
-initWebGL();
+//Function to initialize event handlers
+function initHandlers () {
+	var canvas = document.getElementById("glcanvas");
+	
+	document.addEventListener('keydown', (event) => {
+		//W
+		var update = false;
+		if (event.keyCode === 87){
+			Scene.Camera.position[2] -= 0.25;
+			Scene.Camera.centre[2] -= 0.25;
+			update = true;
+			// console.log(Scene.Camera.position);
+		}
+		//S
+		else if (event.keyCode === 83){
+			Scene.Camera.position[2] += 0.25;
+			Scene.Camera.centre[2] += 0.25;
+			update = true;
+			// console.log(Scene.Camera.position);
+		}
+		//A
+		else if (event.keyCode === 65){
+			Scene.Camera.position[0] -= 0.25;
+			Scene.Camera.centre[0] -= 0.25;
+			update = true;
+		}
+		//D	
+		else if (event.keyCode === 68){
+			Scene.Camera.position[0] += 0.25;
+			Scene.Camera.centre[0] += 0.25;
+			update = true;
+		}
+		
+		event.preventDefault();
+		// rayTracing(Scene, Screen);
+		if (update)
+			inicialitzar(Scene);
+	}, false);
+	
+	canvas.addEventListener('mousedown', (event) => {
+		isMouseDown = true;
+		lastPhi = event.clientY;
+		lastTheta = event.clientX;
+	}, false);
+	
+	canvas.addEventListener('mouseup', (event) => {
+		isMouseDown = false;
+	}, false);
+	
+	canvas.addEventListener('mousemove', (event) => {
+		if (!isMouseDown)
+			return;
+		
+		var newY = (event.clientY - lastPhi) * 0.005;
+		var newX = (event.clientX - lastTheta) * 0.005;
+		
+		phi -= newY;
+		theta += newX;
+		
+		//We limit vertical rotation
+		var margen = Math.PI / 4;
+		phi = Math.min (Math.max(phi, margen), Math.PI - margen);
+		
+		lastPhi = event.clientY;
+		lastTheta = event.clientX;
+		
+		//We set the range of both angles to [0rad...2PIrad]
+		if (theta < 0)
+			theta += Math.PI * 2;
+		if (phi < 0)
+			phi += Math.PI * 2;
+		
+		calculateNewCentre();
+		event.preventDefault();
+		inicialitzar(Scene);
+	}, false);
+}
+
+//Function to create a POI
+function savePOI () {
+	//We set the structure to store info about POI
+	var newPOI = {
+		"eye" : vec3.fromValues(Scene.Camera.position[0], Scene.Camera.position[1], Scene.Camera.position[2]),
+		"centre" : vec3.fromValues(Scene.Camera.centre[0], Scene.Camera.centre[1], Scene.Camera.centre[2]),
+		"phi" : phi,
+		"theta" : theta,
+		"lastPhi" : lastPhi,
+		"lastTheta" : lastTheta
+	};
+	//Push back the new POI
+	poiArray.push(newPOI);
+	
+	//We set the name and value of option for select tag in HTML
+	var optionText = 'POI ' + poiArray.length.toString();
+	var newOption = new Option(optionText, (poiArray.length - 1).toString());
+	
+	//Add option to HTML
+	select.add(newOption, undefined);
+}
+
+//Function to drive the camera to any POI selected in select tag
+function goToPOI () {
+	// We get the POI
+	var poi = poiArray[parseInt(select.value)];
+	
+	// We reset all variables
+	Scene.Camera.position = poi.eye;
+	Scene.Camera.centre = poi.centre;
+	phi = poi.phi;
+	theta = poi.theta;
+	lastPhi = poi.lastPhi;
+	lastTheta = poi.lastTheta;
+	
+	// Draw again
+	inicialitzar(Scene);
+}
+
+function changeColor(input){
+	var name = input.name;
+	
+	if (name === "1")
+		Scene.Lights[0].color = fromHexToRGB(input.value);
+	else if (name === "2")
+		Scene.Lights[1].color = fromHexToRGB(input.value);
+}
+
+//Function to turn HEX value to RGB
+function fromHexToRGB (value) {
+	var myColor = value.substr(1);
+	  
+	var r = myColor.charAt(0) + '' + myColor.charAt(1);
+	var g = myColor.charAt(2) + '' + myColor.charAt(3);
+	var b = myColor.charAt(4) + '' + myColor.charAt(5);
+
+	r = parseInt(r, 16) / 255.0;
+	g = parseInt(g, 16) / 255.0;
+	b = parseInt(b, 16) / 255.0;
+	
+	return vec3.fromValues(r, g, b);
+}
+
+function aux(slider){
+	// console.log(slider.value);
+	Scene.Shapes[6].a[2] = slider.value;
+	// Scene.Shapes[6].b[2] = slider.value;
+	// Scene.Shapes[6].c[2] = slider.value;
+	
+	inicialitzar(Scene);
+}
