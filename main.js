@@ -1,4 +1,4 @@
-
+/* Gemma Reina Lara - u1987712 */
 //Angles per calcular la posició central
 var theta = Math.PI;
 var phi = -Math.PI/2.0;
